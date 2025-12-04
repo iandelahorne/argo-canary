@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: long-lived-canary
+  namespace: rollouts-demo
+  labels:
+    "ian.delahorne.com/argo-canary": bluegreen-demo
+spec:
+  containers:
+    - image: argoproj/rollouts-demo:red
+      imagePullPolicy: Always
+      name: long-lived-canary
+      ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+      resources:
+        requests:
+          cpu: 5m
+          memory: 32Mi
