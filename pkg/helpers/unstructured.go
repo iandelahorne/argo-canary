@@ -1,3 +1,4 @@
+// Package helpers contains various helper functions needed
 package helpers
 
 import (
@@ -8,7 +9,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// Inspired by https://github.com/argoproj/argo-rollouts/blob/master/utils/unstructured/unstructured.go
+// ObjectToPod is inspired by https://github.com/argoproj/argo-rollouts/blob/master/utils/unstructured/unstructured.go
+// This takes an interface{} and converts it either from a struct or a pointer into a Pod pointer
 func ObjectToPod(obj any) *v1.Pod {
 	un, ok := obj.(*unstructured.Unstructured)
 	if ok {

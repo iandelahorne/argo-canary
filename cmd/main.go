@@ -59,7 +59,7 @@ func main() {
 	defer cancel()
 
 	// Create worker queues for the workers that handle update to pods and rollouts.
-	// We're just passing strings in here for now on the format `{namespace}/{name}` - in the future these could be actual objects (if the queues support that)
+	// We're just passing strings in here for now on the format `{namespace}/{name}` - in the future these could be a types.NamespacedName to not require splitting
 	podQueue := workqueue.NewTypedRateLimitingQueue[string](workqueue.NewTypedItemExponentialFailureRateLimiter[string](time.Millisecond, 10*time.Second))
 	rolloutQueue := workqueue.NewTypedRateLimitingQueue[string](workqueue.NewTypedItemExponentialFailureRateLimiter[string](time.Millisecond, 10*time.Second))
 
@@ -78,7 +78,7 @@ func main() {
 	podLister := sharedInformerFactory.Core().V1().Pods().Lister()
 
 	// Add an event handler that will simply add the pod to the queue if it is created or updated.
-	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			pod := helpers.ObjectToPod(obj)
 			podQueue.AddRateLimited(fmt.Sprintf("%s/%s", pod.GetNamespace(), pod.GetName()))
@@ -92,6 +92,9 @@ func main() {
 			log.Printf("Pod Deleted: %s/%s", pod.GetNamespace(), pod.GetName())
 		},
 	})
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	// Since the rollout CRD isn't a pod or other base object, we need to create a dynamic informer from a resource
 	resource := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "rollouts"}
@@ -104,7 +107,7 @@ func main() {
 	rolloutLister := rolloutInformerFactory.ForResource(resource).Lister()
 
 	// Add an event handler that will simply add the rollout to the queue if it is createed or updated.
-	rolloutInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = rolloutInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			rollout := unstructured.ObjectToRollout(obj)
 			rolloutQueue.AddRateLimited(fmt.Sprintf("%s/%s", rollout.GetNamespace(), rollout.GetName()))
@@ -118,6 +121,9 @@ func main() {
 			log.Printf("Rollout Deleted: %s/%s: %v\n", rollout.GetNamespace(), rollout.GetName(), rollout.Status.StableRS)
 		},
 	})
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	var wg sync.WaitGroup
 	wg.Add(1)

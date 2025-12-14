@@ -1,3 +1,5 @@
+// Package workers contains the workers that read from the workqueues
+// and process rollout changes and pod creation/updates
 package workers
 
 import (
@@ -91,7 +93,7 @@ func (w *PodWorker) processPod(ctx context.Context, namespace string, podName st
 		log.Printf("Attempting to update pod %s/%s to %s", namespace, podName, rollout.Status.StableRS)
 		err := patchPod(ctx, w.Client, namespace, podName, rollout.Status.StableRS)
 		if err != nil {
-			log.Printf("Error patching pod %s/%s to %: %v", namespace, podName, rollout.Status.StableRS, err)
+			log.Printf("Error patching pod %s/%s to %s: %v", namespace, podName, rollout.Status.StableRS, err)
 			return err
 		}
 	}
