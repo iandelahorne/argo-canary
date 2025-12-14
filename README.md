@@ -1,6 +1,6 @@
 # argo-canary
 
-argo-canary is a Kubernetes operator that manages long-lived canary deployments for Argo rollouts. 
+argo-canary is a Kubernetes operator that manages long-lived canary deployments alongside deployments managed by [Argo rollouts](https://argo-rollouts.readthedocs.io/en/stable/). 
 
 # Long-lived canaries
 
@@ -12,17 +12,19 @@ Another is the concept of a long-lived canary. This is meant instead to validate
 
 Doordash has a good blog post about this on their engineering blog - [Gradual Code Releases Using an In-House Kubernetes Canary Controller](https://careersatdoordash.com/blog/gradual-code-releases-using-an-in-house-kubernetes-canary-controller/)
 
-## EC2 long lived canaries
+## EC2 long-lived canaries
 
 For long-lived canaries in an EC2 environment, this is fairly easy - launch an instance with the canary branch and attach it to the load balancer alongside the normal deployment-managed autoscaling groups. If the main deployment has n instances, the canary instance will take 1/n+1 amount of the traffic.
 
 ## Normal kubernetes deployment
 
-In the case of a normal kubernetes deployment, this is similar to the EC2 instance. If we have a `Service` for the application with label selectors for matching the pods and a `Deployment` with the correct labels for the services label selector, we can easily launch a `Pod` with the same labels. This will have the same effect as in EC2 - if the `Deployment` has n pods, the canary pod will take 1/n+1 amount of traffic.
+In the case of a normal Kubernetes deployment, this is similar to the EC2 instance. If we have a `Service` for the application with label selectors for matching the pods and a `Deployment` with the correct labels for the services label selector, we can easily launch a `Pod` with the same labels. This will have the same effect as in EC2 - if the `Deployment` has n pods, the canary pod will take 1/n+1 amount of traffic.
 
 ## Argo Rollout blue/green deployments and canaries 
 
-If we have the application deployed with Argo Rollouts using the `blueGreen` strategy, this presents a bit of an issue. Argo Rollouts manages both the underlying `ReplicaSets` for each version, and also the `Service` object exposing the application (`.spec.strategy.blueGreen.activeService`). Argo Rollouts specifically adds a `rollouts-pod-template-hash` label selector to the `Service`. As the Rollout progresses when deploying a new version, the new version's `ReplicaSet` has a `rollouts-pod-template-hash` label added to it, and the Services label selector value is updated to the latest production version.
+If we have the application deployed with Argo Rollouts using the [blueGreen](https://argo-rollouts.readthedocs.io/en/stable/features/bluegreen/) strategy, this presents a bit of an issue. 
+
+Argo Rollouts manages both the underlying `ReplicaSets` for each version, and also the `Service` object exposing the application (`.spec.strategy.blueGreen.activeService`). When a rollout is create, Argo Rollouts adds a `rollouts-pod-template-hash` label selector to the `Service` and the `ReplicaSet` it manages. As the Rollout progresses when deploying a new version, the controller creates a new `ReplicaSet` with a `rollouts-pod-template-hash` based off that version. When it progresses the blue/green deployment, the Service's label selector value is updated to match the latest production ReplicaSet's `rollouts-pod-template-hash`.
 
 To ensure that a long-lived canary Pod continues to take traffic as the Rollout progresses, we need to copy the `rollouts-pod-template-hash` to the Pod. That is what this controller does.
 
