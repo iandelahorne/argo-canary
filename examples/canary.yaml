@@ -4,7 +4,7 @@ metadata:
   name: long-lived-canary
   namespace: rollouts-demo
   labels:
-    "ian.delahorne.com/argo-canary": bluegreen-demo
+    "ian.delahorne.com/argo-canary": bluegreen-demo-nonexistent
 spec:
   containers:
     - image: argoproj/rollouts-demo:red

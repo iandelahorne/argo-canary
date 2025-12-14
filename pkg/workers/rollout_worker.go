@@ -60,7 +60,7 @@ func (w *RolloutWorker) processNextWorkItem(ctx context.Context) bool {
 	// wrap the splitting and processing in a func so we can defer w.Queue.Done()
 	err := func(key string) error {
 		defer w.Queue.Done(key)
-		log.Println("Rollout processing " + key)
+		log.Println("Processing rollout: " + key)
 		namespace, name, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
 			return err

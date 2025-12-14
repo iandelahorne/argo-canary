@@ -11,6 +11,7 @@ import (
 	"github.com/argoproj/argo-rollouts/utils/unstructured"
 	"github.com/iandelahorne/argo-canary/pkg/constants"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -62,6 +63,11 @@ func (w *PodWorker) processPod(ctx context.Context, namespace string, podName st
 	// Fetch pod object from lister
 	pod, err := w.PodLister.Pods(namespace).Get(podName)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			log.Printf("Pod %s/%s not found, likely was deleted, skipping", namespace, podName)
+			return nil
+		}
+		log.Printf("Failed to get pod %s/%s due to error %v", namespace, podName, err)
 		return err
 	}
 
@@ -79,6 +85,10 @@ func (w *PodWorker) processPod(ctx context.Context, namespace string, podName st
 	// fetch Rollout from lister
 	obj, err := w.RolloutLister.Get(fmt.Sprintf("%s/%s", namespace, rolloutName))
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			log.Printf("Rollout %s/%s specfied by Pod %s/%s not found, skipping", namespace, rolloutName, namespace, podName)
+			return nil
+		}
 		log.Printf("Failed to fetch rollout %s/%s: %v", namespace, rolloutName, err)
 		return err
 	}
@@ -110,7 +120,7 @@ func (w *PodWorker) processNextWorkItem(ctx context.Context) bool {
 	// wrap the splitting and processing in a func so we can defer w.Queue.Done()
 	err := func(key string) error {
 		defer w.Queue.Done(key)
-
+		log.Println("Processing pod: " + key)
 		namespace, name, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
 			return err
