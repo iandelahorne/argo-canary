@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -13,6 +12,7 @@ import (
 	"github.com/iandelahorne/argo-canary/pkg/constants"
 	"github.com/iandelahorne/argo-canary/pkg/helpers"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 
@@ -59,9 +59,8 @@ func main() {
 	defer cancel()
 
 	// Create worker queues for the workers that handle update to pods and rollouts.
-	// We're just passing strings in here for now on the format `{namespace}/{name}` - in the future these could be a types.NamespacedName to not require splitting
-	podQueue := workqueue.NewTypedRateLimitingQueue[string](workqueue.NewTypedItemExponentialFailureRateLimiter[string](time.Millisecond, 10*time.Second))
-	rolloutQueue := workqueue.NewTypedRateLimitingQueue[string](workqueue.NewTypedItemExponentialFailureRateLimiter[string](time.Millisecond, 10*time.Second))
+	podQueue := workqueue.NewTypedRateLimitingQueue[types.NamespacedName](workqueue.NewTypedItemExponentialFailureRateLimiter[types.NamespacedName](time.Millisecond, 10*time.Second))
+	rolloutQueue := workqueue.NewTypedRateLimitingQueue[types.NamespacedName](workqueue.NewTypedItemExponentialFailureRateLimiter[types.NamespacedName](time.Millisecond, 10*time.Second))
 
 	// Set up an informer for pods. We'll pass a label selector to the ListOptions so it only filters
 	// pods that have the canary rollout label on them
@@ -81,11 +80,19 @@ func main() {
 	_, err = podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			pod := helpers.ObjectToPod(obj)
-			podQueue.AddRateLimited(fmt.Sprintf("%s/%s", pod.GetNamespace(), pod.GetName()))
+			key := types.NamespacedName{
+				Namespace: pod.GetNamespace(),
+				Name:      pod.GetName(),
+			}
+			podQueue.AddRateLimited(key)
 		},
 		UpdateFunc: func(oldObj, newObj any) {
 			pod := helpers.ObjectToPod(newObj)
-			podQueue.AddRateLimited(fmt.Sprintf("%s/%s", pod.GetNamespace(), pod.GetName()))
+			key := types.NamespacedName{
+				Namespace: pod.GetNamespace(),
+				Name:      pod.GetName(),
+			}
+			podQueue.AddRateLimited(key)
 		},
 		DeleteFunc: func(obj any) {
 			pod := helpers.ObjectToPod(obj)
@@ -110,11 +117,19 @@ func main() {
 	_, err = rolloutInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			rollout := unstructured.ObjectToRollout(obj)
-			rolloutQueue.AddRateLimited(fmt.Sprintf("%s/%s", rollout.GetNamespace(), rollout.GetName()))
+			key := types.NamespacedName{
+				Namespace: rollout.GetNamespace(),
+				Name:      rollout.GetName(),
+			}
+			rolloutQueue.AddRateLimited(key)
 		},
 		UpdateFunc: func(oldObj, newObj any) {
 			rollout := unstructured.ObjectToRollout(newObj)
-			rolloutQueue.AddRateLimited(fmt.Sprintf("%s/%s", rollout.GetNamespace(), rollout.GetName()))
+			key := types.NamespacedName{
+				Namespace: rollout.GetNamespace(),
+				Name:      rollout.GetName(),
+			}
+			rolloutQueue.AddRateLimited(key)
 		},
 		DeleteFunc: func(obj any) {
 			rollout := unstructured.ObjectToRollout(obj)

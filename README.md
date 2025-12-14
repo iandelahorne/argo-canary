@@ -173,4 +173,3 @@ kubectl get pod long-lived-canary -o jsonpath='{.metadata.labels.rollouts-pod-te
 - OpenTelemetry tracing for pod operations
 - Leader election to be able to run with high availability, yet only have one active instance updating pods
 - Create manifest for running argo-canary in cluster
-- Consider passing structs in the queues instead of just namespace/name pairs

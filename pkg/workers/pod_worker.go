@@ -34,7 +34,7 @@ const (
 type PodWorker struct {
 	Client        kubernetes.Interface
 	PodLister     corev1.PodLister
-	Queue         workqueue.TypedRateLimitingInterface[string]
+	Queue         workqueue.TypedRateLimitingInterface[types.NamespacedName]
 	RolloutLister cache.GenericLister
 }
 
@@ -118,14 +118,10 @@ func (w *PodWorker) processNextWorkItem(ctx context.Context) bool {
 		return false
 	}
 	// wrap the splitting and processing in a func so we can defer w.Queue.Done()
-	err := func(key string) error {
+	err := func(key types.NamespacedName) error {
 		defer w.Queue.Done(key)
-		log.Println("Processing pod: " + key)
-		namespace, name, err := cache.SplitMetaNamespaceKey(key)
-		if err != nil {
-			return err
-		}
-		return w.processPod(ctx, namespace, name)
+		log.Println("Processing pod: " + key.String())
+		return w.processPod(ctx, key.Namespace, key.Name)
 	}(key)
 
 	if err != nil {

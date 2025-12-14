@@ -2,12 +2,12 @@ package workers
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/iandelahorne/argo-canary/pkg/constants"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/listers/core/v1"
@@ -18,8 +18,8 @@ import (
 type RolloutWorker struct {
 	Client        kubernetes.Interface
 	PodLister     corev1.PodLister
-	Queue         workqueue.TypedRateLimitingInterface[string]
-	PodQueue      workqueue.TypedRateLimitingInterface[string]
+	Queue         workqueue.TypedRateLimitingInterface[types.NamespacedName]
+	PodQueue      workqueue.TypedRateLimitingInterface[types.NamespacedName]
 	RolloutLister cache.GenericLister
 }
 
@@ -43,7 +43,11 @@ func (w *RolloutWorker) processRollout(ctx context.Context, namespace, rolloutNa
 
 	// add all pods found to the pod update queue
 	for _, pod := range pods {
-		w.PodQueue.AddRateLimited(fmt.Sprintf("%s/%s", pod.Namespace, pod.Name))
+		key := types.NamespacedName{
+			Namespace: pod.GetNamespace(),
+			Name:      pod.GetName(),
+		}
+		w.PodQueue.AddRateLimited(key)
 	}
 
 	return nil
@@ -58,14 +62,10 @@ func (w *RolloutWorker) processNextWorkItem(ctx context.Context) bool {
 		return false
 	}
 	// wrap the splitting and processing in a func so we can defer w.Queue.Done()
-	err := func(key string) error {
+	err := func(key types.NamespacedName) error {
 		defer w.Queue.Done(key)
-		log.Println("Processing rollout: " + key)
-		namespace, name, err := cache.SplitMetaNamespaceKey(key)
-		if err != nil {
-			return err
-		}
-		return w.processRollout(ctx, namespace, name)
+		log.Println("Processing rollout: " + key.String())
+		return w.processRollout(ctx, key.Namespace, key.Name)
 	}(key)
 
 	if err != nil {
